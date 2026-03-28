@@ -13,12 +13,16 @@ class TransformerBlock(nn.Module):
         self.ln2  = nn.LayerNorm(d_model)
         self.drop = nn.Dropout(dropout)
 
-    def forwars(self, x, mask=None) -> Tensor:
+    def forward(self, x) -> Tensor:
         x = x + self.drop(
             self.attn(
                 query=self.ln1(x),
                 key  =self.ln1(x),
                 value=self.ln1(x),
-                attn_mask=mask
+                is_causal=True
             )[0]
         )
+
+        x = x + self.drop(self.ff(self.ln2(x)))
+
+
