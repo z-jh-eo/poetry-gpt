@@ -23,12 +23,14 @@ class TransformerBlock(nn.Module):
         self.drop = nn.Dropout(config.dropout)
 
     def forward(self, x):
+        normed_x = self.ln1(x)
         x = x + self.drop(
             self.attn(
-                query=self.ln1(x),
-                key  =self.ln1(x),
-                value=self.ln1(x),
-                is_causal=True
+                query=normed_x,
+                key  =normed_x,
+                value=normed_x,
+                is_causal=True,
+                need_weights=False,
             )[0]
         )
 
