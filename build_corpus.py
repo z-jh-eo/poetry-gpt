@@ -45,15 +45,12 @@ def remove_source_urls(text: str) -> str:
 
 def remove_tables_of_contents(text: str) -> str:
     pattern = re.compile(
-        r"(TABLE DES MATI(?:È|E)RES(.|\s)*?\n{2,})",
-        re.IGNORECASE,
-    )
+        r"(TABLE(.|\s)*?\n{2,})")
     match = pattern.search(text)
     if match:
         return text[: match.start()] + text[match.end() :]
     pattern_inline = re.compile(
-        r"(\bTable(.|\n|\r)*?\.\.\.\s*\d{2,})",
-        re.IGNORECASE,
+        r"(\bTable(.|\n|\r)*?\.\.\.\s*\d{2,})"
     )
     match_inline = pattern_inline.search(text)
     if match_inline:
@@ -62,8 +59,7 @@ def remove_tables_of_contents(text: str) -> str:
 
 
 def remove_cover_sections(text: str) -> str:
-    match = re.search(r"\bTous droits r[ée]servés\b.*?\n", 
-                                        text, re.IGNORECASE)
+    match = re.search(r"\bTous droits r[ée]servés\b.*?\n", text)
     if match:
         return text[match.end() :]
     return text
@@ -85,6 +81,7 @@ def _looks_like_verse_line(line: str) -> bool:
     else:
         return False
     return True
+
 
 def _find_poem_body_index(text:str, start_offset:int = 0) -> int | None:
     if start_offset >= len(text):
@@ -130,6 +127,7 @@ def remove_prefaces(text: str) -> str:
 
 def remove_footnotes(text: str) -> str:
     text = re.sub(r"\[\d+\]", "", text)
+    text = re.sub(r"\[(.|\s)*?\]", "", text)
     text = re.sub(r"\n\s*\d+\.?\s+", "\n", text)
     return text
 
