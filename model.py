@@ -5,14 +5,71 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
+class CausalSelfAttention(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        assert config.embd_d % config.n_head == 0,\
+            "embd_d must be divisible by n_head"
+
+        self.n_head  = config.n_head
+        self.embd_d  = config.embd_d
+        self.head_d  = config.embd_d // config.n_head
+        self.dropout = config.dropout
+        self.causal_mask = config.causal_mask #"flash" | "manual"
+
+        self.c_attn  = nn.Linear(config.embd_d, 3 * config.embd_d, bias=config.bias)
+        self.c_proj  = nn.Linear(config.embd_d,     config.embd_d, bias=config.bias)
+        
+        self.attn_drop  = nn.Dropout(config.dropout)
+        self.resid_drop = nn.Dropout(config.dropout)
+
+    def forward(self, x):
+        B, T, C = x.shape  #B:batch size, T:nb of tokens, C:embd dim
+
+        # project to QKV
+        q, k, v = self.c_attn(x).split(self.embd_d, dim=2) 
+                                #split the QKV that we initilised together
+        def split_heads(t):
+            return t.view(B, T, self.n_head, self.head_d).transpose(1,2)
+
+        q, k, v = split_heads(q), split_heads(k), split_heads(v)
+
+        # SDPA
+        dropout_p = self.dropout if self.training else 0.0
+
+        if self.causal_mask == "flash":
+            y = F.scaled_dot_product_attention(
+                q, k, v,
+                attn_mask=None,
+                dropout_p=dropout_p,
+                is_causal=True,
+            )
+        elif self.causal_mask == "manual":
+            mask = torch.ones(T, T, dtype=torch.bool, deive=x.device)
+            mask = mask.view(1, 1, T, T)
+
+            y = F.scaled_dot_product_attention(
+                q, k, v,
+                attn_mask=mask,
+                dropout_p=dropout_p,
+                is_causal=False,
+            )
+        else:
+            raise ValueError(
+                "Unknown causal mask. Choose 'flash' or 'manual'."
+            )
+        
+        # reassemble heads
+        y = y.transpose(1,2).contiguous().view(B, T, C)
+        y = self.resid_drop(self.c_proj(y))
+        return y
+
+
 class TransformerBlock(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.attn = nn.MultiheadAttention(
-            config.embd_d,
-            config.n_head,
-            batch_first=True
-        )
+        self.attn = CausalSelfAttention(config)
         self.ff   = nn.Sequential(
             nn.Linear(config.embd_d, 4*config.embd_d, bias=config.bias),
             nn.GELU(),
@@ -20,33 +77,22 @@ class TransformerBlock(nn.Module):
         )
         self.ln1  = nn.LayerNorm(config.embd_d)
         self.ln2  = nn.LayerNorm(config.embd_d)
-        self.drop = nn.Dropout(config.dropout)
 
     def forward(self, x):
-        normed_x = self.ln1(x)
-        x = x + self.drop(
-            self.attn(
-                query=normed_x,
-                key  =normed_x,
-                value=normed_x,
-                is_causal=True,
-                need_weights=False,
-            )[0]
-        )
-
-        x = x + self.drop(self.ff(self.ln2(x)))
-
+        x = x + self.attn(self.ln1(x))
+        x = x + self.ff(self.ln2(x))
         return(x)
 
 @dataclass
 class GPTConfig:
-    block_size: int = 1024
-    vocab_size: int = 50304
-    n_layer: int    = 12
-    n_head: int     = 12
-    embd_d: int     = 768
-    dropout: float  = 0.1
-    bias: bool      = True
+    block_size: int  = 1024
+    vocab_size: int  = 50304
+    n_layer: int     = 12
+    n_head: int      = 12
+    embd_d: int      = 768
+    dropout: float   = 0.1
+    bias: bool       = True
+    causal_mask: str = "flash"   #("flash" | "manual")
 
 
 class GPT(nn.Module):
@@ -126,7 +172,8 @@ class GPT(nn.Module):
         """
         for _ in range(max_new_tokens):
             # Crop context to block_size if needed
-            idx_cond = idx if idx.size(1) <= self.config.block_size else idx[:, -self.config.block_size:]
+            idx_cond = idx if idx.size(1) <= self.config.block_size\
+                                    else idx[:, -self.config.block_size:]
             logits, _ = self(idx_cond)
             logits = logits[:, -1, :] / temperature  # (b, vocab_size)
  
