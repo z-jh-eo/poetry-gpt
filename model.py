@@ -85,11 +85,11 @@ class TransformerBlock(nn.Module):
 
 @dataclass
 class GPTConfig:
-    block_size: int  = 1024
-    vocab_size: int  = 50304
-    n_layer: int     = 12
-    n_head: int      = 12
-    embd_d: int      = 768
+    block_size: int  = 256
+    vocab_size: int  = 100
+    n_layer: int     = 6
+    n_head: int      = 8
+    embd_d: int      = 64
     dropout: float   = 0.1
     bias: bool       = True
     causal_mask: str = "flash"   #("flash" | "manual")
