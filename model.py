@@ -89,7 +89,7 @@ class GPTConfig:
     vocab_size: int  = 100
     n_layer: int     = 6
     n_head: int      = 8
-    embd_d: int      = 64
+    embd_d: int      = 256
     dropout: float   = 0.1
     bias: bool       = True
     causal_mask: str = "flash"   #("flash" | "manual")
