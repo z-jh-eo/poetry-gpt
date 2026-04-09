@@ -188,7 +188,9 @@ for step in range(max_steps):
             "val_loss"  : val_loss if step % eval_interval == 0 else None,
         }, ckpt_path)
         print(f"Checkpoint saved to {ckpt_path}")
- 
+
+
+metrics.close() 
 print("\nTraining complete.")
 
 final_model_path = f"checkpoints/model_step{max_steps:06d}.pt"
