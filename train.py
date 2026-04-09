@@ -5,6 +5,7 @@ import time
 import torch
 from build_data import BuildData
 from model import GPTConfig, GPT
+from write_metrics import MetricsWriter
 
 torch.manual_seed(42)
 
@@ -57,6 +58,8 @@ if use_compile:
 
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=max_lr)
+
+metrics = MetricsWriter("metrics.tsv")
 
 
 def get_lr(step:int) -> float:
@@ -125,6 +128,8 @@ def log(step: int, val_loss: float, t_elapsed: float) -> None:
         f"lr {lr_now:.2e} | "
         f"{t_elapsed:.1f}s"
     )
+    metrics.write(step, train_loss, bpc_train, 
+                  val_loss, bpc_val, lr_now, t_elapsed)
     _train_loss_window.clear()
 
 
@@ -182,6 +187,18 @@ for step in range(max_steps):
             "config"    : config,
             "val_loss"  : val_loss if step % eval_interval == 0 else None,
         }, ckpt_path)
-        print(f"Checkpoint saved → {ckpt_path}")
+        print(f"Checkpoint saved to {ckpt_path}")
  
 print("\nTraining complete.")
+
+final_model_path = f"checkpoints/model_step{max_steps:06d}.pt"
+torch.save({
+    "step"      : max_steps,
+    "model"     : model.state_dict(),
+    "optimizer" : optimizer.state_dict(),
+    "config"    : config,
+    "val_loss"  : estimate_val_loss(),
+}, final_model_path)
+
+print(f"Model saved to {final_model_path}")
+
