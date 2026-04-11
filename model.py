@@ -85,7 +85,7 @@ class TransformerBlock(nn.Module):
 
 @dataclass
 class GPTConfig:
-    block_size: int  = 256
+    window_size: int  = 256
     vocab_size: int  = 100
     n_layer: int     = 6
     n_head: int      = 8
@@ -99,12 +99,12 @@ class GPT(nn.Module):
     def __init__(self,config):
         super().__init__()
         assert config.vocab_size is not None
-        assert config.block_size is not None
+        assert config.window_size is not None
         self.config =  config
 
         self.transformer = nn.ModuleDict(dict(
             wte = nn.Embedding(config.vocab_size, config.embd_d), # token embedding table
-            wpe = nn.Embedding(config.block_size, config.embd_d), # position embedding table
+            wpe = nn.Embedding(config.window_size, config.embd_d), # position embedding table
             drop = nn.Dropout(config.dropout),
             h = nn.ModuleList([TransformerBlock(config) for _  in range(config.n_layer)]),
             ln_f = nn.LayerNorm(config.embd_d)
@@ -137,7 +137,7 @@ class GPT(nn.Module):
     def forward(self, idx, targets=None): 
         device = idx.device
         b, t = idx.size()
-        assert t <= self.config.block_size
+        assert t <= self.config.window_size
 
         pos = torch.arange(0, t, dtype=torch.long, device=device)  # (t,)
  
@@ -171,9 +171,9 @@ class GPT(nn.Module):
         idx: (b, t) LongTensor of conditioning token indices.
         """
         for _ in range(max_new_tokens):
-            # Crop context to block_size if needed
-            idx_cond = idx if idx.size(1) <= self.config.block_size\
-                           else idx[:, -self.config.block_size:]
+            # Crop context to window_size if needed
+            idx_cond = idx if idx.size(1) <= self.config.window_size\
+                           else idx[:, -self.config.window_size:]
             logits, _ = self(idx_cond)
             logits = logits[:, -1, :] / temperature  # (b, vocab_size)
  

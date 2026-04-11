@@ -21,7 +21,7 @@ print(f"Using device: {device}")
 
 
 # --- Hyperparameters ---
-block_size   = 256
+window_size   = 256
 batch_size   = 64
 max_steps    = 30_000
 warmup_steps = 500
@@ -41,7 +41,7 @@ os.makedirs("samples",     exist_ok=True)
 
 config = GPTConfig(
     vocab_size  = dataset.vocab_size,
-    block_size  = block_size,
+    window_size  = window_size,
     n_layer     = 6,
     embd_d      = 256,
     dropout     = 0.1,
@@ -71,9 +71,9 @@ def get_lr(step:int) -> float:
 def get_batch(split:str):
     data = train_data if split == "train" else val_data
     # Sample random starting positions
-    ix = torch.randint(len(data) - block_size - 1, (batch_size,))
-    x = torch.stack([data[i        : i + block_size    ] for i in ix])
-    y = torch.stack([data[i + 1    : i + block_size + 1] for i in ix])
+    ix = torch.randint(len(data) - window_size - 1, (batch_size,))
+    x = torch.stack([data[i        : i + window_size    ] for i in ix])
+    y = torch.stack([data[i + 1    : i + window_size + 1] for i in ix])
     if device == "cuda":
         # pin arrays x,y, which allows us to move them 
         # to GPU asynchronously (non_blocking=True)
